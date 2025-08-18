@@ -1,40 +1,49 @@
-name: build analyze, scan
+name: CI/CD Pipeline
+
 on:
   push:
     branches:
-      - main
+      - main   # adjust if your branch is different
 
 jobs:
-  build-analyze-scan:
-    name: build
-    runs-on: [self-hosted]
+  build-and-deploy:
+    runs-on: self-hosted   # since you’re using GitHub runner on your local
+
     steps:
-      - name: checkout the code
+      # Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: BUilding code and analyze with SonarQube
-        uses: actions/checkout@master
+
+      # SonarQube Scan
+      - name: SonarQube Scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      - name: dependencies install
         run: |
-          npm install
-  deploy:
-    name: deploy app to docker
-    needs: build-analyze-scan
-    runs-on: [self-hosted]
-    steps:
-      - name: docker pull
-        run: docker pull manlineroot12/zomato:latest
-      - name: Configure aws credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: update-kubeconfig
-        run: aws eks update-kubeconfig --name Zomato-demo-cluster --region ap-south-1
-      - name: Deploy to kubernetes
-        run: kubectl apply -f deployment-service.yml
+          docker run --rm \
+            -e SONAR_HOST_URL="http://localhost:9000" \
+            -e SONAR_LOGIN=$SONAR_TOKEN \
+            -v "${{ github.workspace }}:/usr/src" \
+            sonarsource/sonar-scanner-cli
+
+      # Build Docker Image
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/zomato:latest .
+
+      # Push to DockerHub
+      - name: Push Docker Image
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/zomato:latest
+
+      # Trivy Scan
+      - name: Trivy Scan
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image ${{ secrets.DOCKERHUB_USERNAME }}/zomato:latest
+
+      # Deploy to Kind
+      - name: Deploy to Kind
+        run: |
+          kubectl apply -f deployment-service.yml
+          kubectl rollout status deployment/zomato
