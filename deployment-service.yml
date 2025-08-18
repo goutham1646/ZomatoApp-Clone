@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: zomato
-        image: manlineroot12/zomato:latest
+        image: gouthamkumarsai/zomato:latest
         ports:
         - containerPort: 3000   # App runs on 3000 inside container
 
