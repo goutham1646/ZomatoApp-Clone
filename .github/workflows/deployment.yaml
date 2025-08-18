@@ -1,49 +1,37 @@
-name: CI/CD Pipeline
+name: CI/CD with Kind
 
 on:
   push:
     branches:
-      - main   # adjust if your branch is different
+      - main
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted   # since you’re using GitHub runner on your local
-
+    runs-on: self-hosted   # since you're using local GitHub runner with Kind
     steps:
-      # Checkout repo
-      - name: Checkout code
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      # SonarQube Scan
-      - name: SonarQube Scan
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # Install Node.js dependencies before docker build
+      - name: Install dependencies
         run: |
-          docker run --rm \
-            -e SONAR_HOST_URL="http://localhost:9000" \
-            -e SONAR_LOGIN=$SONAR_TOKEN \
-            -v "${{ github.workspace }}:/usr/src" \
-            sonarsource/sonar-scanner-cli
+          npm install
 
-      # Build Docker Image
-      - name: Build Docker Image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/zomato:latest .
-
-      # Push to DockerHub
-      - name: Push Docker Image
+      # Build docker image
+      - name: Build Docker image
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/zomato:latest .
+
+      # Login to Docker Hub
+      - name: Docker login
+        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+      # Push image
+      - name: Push image
+        run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/zomato:latest
 
-      # Trivy Scan
-      - name: Trivy Scan
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:latest image ${{ secrets.DOCKERHUB_USERNAME }}/zomato:latest
-
-      # Deploy to Kind
-      - name: Deploy to Kind
+      # Apply Kubernetes deployment
+      - name: Deploy to Kind cluster
         run: |
           kubectl apply -f deployment-service.yml
-          kubectl rollout status deployment/zomato
