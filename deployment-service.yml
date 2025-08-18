@@ -17,7 +17,7 @@ spec:
       - name: zomato
         image: manlineroot12/zomato:latest
         ports:
-        - containerPort: 3000   # Use port 3000
+        - containerPort: 3000   # App runs on 3000 inside container
 
 ---
 apiVersion: v1
@@ -29,6 +29,6 @@ spec:
     app: zomato
   ports:
   - protocol: TCP
-    port: 80                 # Expose port 80
-    targetPort: 3000
-  type: LoadBalancer
+    port: 7080              # Service port (clients use this)
+    targetPort: 3000        # Forward to container’s 3000
+  type: LoadBalancer         # Kind will map to a random NodePort
