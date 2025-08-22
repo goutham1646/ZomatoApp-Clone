@@ -32,7 +32,7 @@ jobs:
           DOCKER_CLI_ACL: 1 
         
   deploy:            
-    needs: abuild-analyze-scan
+    needs: build-analyze-scan
     runs-on: [self-hosted]
     steps: 
       - name: docker pull
