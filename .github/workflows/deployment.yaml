@@ -28,8 +28,9 @@ jobs:
           docker tag zomato gouthamkumarsai/zomato:latest1
           docker login -u ${{ secret.DOCKER_USERNAME }} -p {{ secret.DOCKER_TOKEN }}      
           docker push gouthamkumarsai/zomato:latest1
-      - name: trivy scan image
-        run: trivy image gouthamkumarsai/zomato:latest1 
+        env:
+          DOCKER_CLI_ACL: 1 
+        
   deploy:            
     needs: abuild-analyze-scan
     runs-on: [self-hosted]
@@ -38,5 +39,6 @@ jobs:
         run: docker pull gouthamkumarsai/zomato:latest1
       - name: Image Scan 
         run: trivy image gouthamkumarsai/zomato:latest1
-      - name: docker run -itd -p 3000:3000 --name zomato gouthamkumarsai/zomato:latest1    
+      - name: docker run container 
+        run: docker run -itd -p 3000:3000 --name zomato gouthamkumarsai/zomato:latest1    
            
